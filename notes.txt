@@ -1,84 +1,39 @@
-podman login -u alojz.cerne 
-
-podman tag moodle quay.io/alojzcerne/moodle:last
-podman push quay.io/alojzcerne/moodle:last
-
 
 cd /home/lojz/md/projekti/CDIUL/moodle
 
 ( mkdir /tmp/moodle_$$; cd /tmp/moodle_$$; 
   git clone git://git.moodle.org/moodle.git;
-  (cd moodle; git archive --format=tar.gz -o /home/lojz/md/projekti/CDIUL/moodle/moodle.tar.gz main_404_stable); 
+  ( cd moodle; 
+    git checkout MOODLE_404_STABLE;
+    git pull origin MOODLE_404_STABLE;
+    git archive --format=tar.gz -o /home/lojz/md/projekti/CDIUL/moodle/moodle.tar.gz MOODLE_404_STABLE
+  ); 
   rm -rf /tmp/moodle_$$;
 )
 
 ls -la /home/lojz/.local/share/containers/storage/volumes/cdiul_moodle_data/_data/
 
+podman login -u alojzcerne quay.io
 ( cd /home/lojz/md/projekti/CDIUL/moodle; 
   podman build -t moodle .
+  podman tag moodle quay.io/alojzcerne/moodle:latest; podman push quay.io/alojzcerne/moodle:latest
 )
+oc import-image mdleapp 
+
 podman run --rm -it moodle bash
 
 podman-compose down; podman volume rm cdiul_mariadb_data cdiul_moodle_data; podman-compose up -d
 podman-compose down; podman-compose up -d
 podman exec -it cdiul_moodle_1 bash
 
-php /moodle/app/admin/cli/install.php \
- --allow-unstable  \
- --agree-license \
- --non-interactive \
- --lang=sl \
- --dbtype=${MOODLE_DATABASE_TYPE} \
- --dbhost=${MOODLE_DATABASE_HOST} \
- --dbport=${MOODLE_DATABASE_PORT_NUMBER}\
- --dbuser=${MOODLE_DATABASE_USER}\
- --dbname=${MOODLE_DATABASE_NAME}\
- --dbpass=${MOODLE_DATABASE_PASSWORD}\
- \
- --adminuser=${MOODLE_USERNAME} \
- --adminpass=${MOODLE_PASSWORD} \
- --wwwroot=${MOODLE_HOST} \
- --fullname='Template classroom' \
- --shortname='Template' \
- --dataroot=/moodle/data 
-chmod +r /moodle/app/config.php
- 
 
- 
 
-Options:
---chmod=OCTAL-MODE    Permissions of new directories created within dataroot.
-                      Default is 2777. You may want to change it to 2770
-                      or 2750 or 750. See chmod man page for details.
---lang=CODE           Installation and default site language.
---wwwroot=URL         Web address for the Moodle site,
-                      required in non-interactive mode.
---dataroot=DIR        Location of the moodle data folder,
-                      must not be web accessible. Default is moodledata
-                      in the parent directory.
---dbtype=TYPE         Database type. Default is mysqli
---dbhost=HOST         Database host. Default is localhost
---dbname=NAME         Database name. Default is moodle
---dbuser=USERNAME     Database user. Default is root
---dbpass=PASSWORD     Database password. Default is blank
---dbport=NUMBER       Use database port.
---dbsocket=PATH       Use database socket, 1 means default. Available for some databases only.
---prefix=STRING       Table prefix for above database tables. Default is mdl_
---fullname=STRING     The fullname of the site
---shortname=STRING    The shortname of the site
---summary=STRING      The summary to be displayed on the front page
---adminuser=USERNAME  Username for the moodle admin account. Default is admin
---adminpass=PASSWORD  Password for the moodle admin account,
-                      required in non-interactive mode.
---adminemail=STRING   Email address for the moodle admin account.
---sitepreset=STRING   Admin site preset to be applied during the installation process.
---supportemail=STRING Email address for support and help.
---upgradekey=STRING   The upgrade key to be set in the config.php, leave empty to not set it.
---non-interactive     No interactive questions, installation fails if any
-                      problem encountered.
---agree-license       Indicates agreement with software license,
-                      required in non-interactive mode.
---allow-unstable      Install even if the version is not marked as stable yet,
-                      required in non-interactive mode.
---skip-database       Stop the installation before installing the database.
--h, --help            Print out this help
+oc login -u admin https://api.ocp4.martinj.hrib.net:6443
+oc new-project mdl02
+
+oc process -f /home/lojz/md/projekti/CDIUL/resources/moodle.yaml \
+  -p HOST=mdl02.apps.ocp4.martinj.hrib.net \
+  -p TEMPLATE_ID=01 \
+  -p FULL_NAME=Razred \
+  -p SHORT_NAME=RDR \
+  | oc apply -f -
