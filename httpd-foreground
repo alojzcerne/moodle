@@ -1,0 +1,40 @@
+#!/bin/sh
+set -e
+
+( flock -x -w 600 200 || exit 1
+
+  if [ ! -e "/moodle/initialized" ]; then
+    
+    ( cd /moodle/app
+      echo "Extracting ${MOODLE_TEMPLATE_ID}"
+      tar -xzf /moodle-${MOODLE_TEMPLATE_ID}.tar.gz
+    )
+    
+    php /moodle/app/admin/cli/install.php \
+           --allow-unstable  \
+           --agree-license \
+           --non-interactive \
+           --lang=sl \
+           --dbtype=${MOODLE_DATABASE_TYPE} \
+           --dbhost=${MOODLE_DATABASE_HOST} \
+           --dbport=${MOODLE_DATABASE_PORT_NUMBER}\
+           --dbuser=${MOODLE_DATABASE_USER}\
+           --dbname=${MOODLE_DATABASE_NAME}\
+           --dbpass=${MOODLE_DATABASE_PASSWORD}\
+           --adminuser=${MOODLE_USERNAME} \
+           --adminpass=${MOODLE_PASSWORD} \
+           --wwwroot=${MOODLE_HOST} \
+           --fullname="${MOODLE_FULL_NAME}" \
+           --shortname="${MOODLE_SHORT_NAME}" \
+           --dataroot=/moodle/data 
+    chmod +r /moodle/app/config.php
+    
+    date > /moodle/initialized
+  
+  fi
+  
+) 200>/moodle/.init.exclusivelock
+
+
+php-fpm &
+exec httpd -DFOREGROUND "$@"
