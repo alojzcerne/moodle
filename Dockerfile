@@ -1,10 +1,10 @@
 FROM ubi9
 
-RUN dnf -y update && yum install -y httpd procps-ng && \
+RUN dnf -y update && yum install -y httpd procps-ng postfix && \
     dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf -y install http://rpms.remirepo.net/enterprise/remi-release-9.rpm -y && \
     dnf -y module enable php:remi-8.2 && \
-    dnf -y install php php-{fpm,curl,pgsql,xml,ldap,soap,bcmath,bz2,intl,gd,mbstring,zip} php-mysqlnd php-sodium
+    dnf -y install php php-{fpm,curl,pgsql,xml,ldap,soap,bcmath,bz2,intl,gd,mbstring,zip} php-mysqlnd php-sodium 
 
 COPY httpd-foreground /usr/local/bin/httpd-foreground
 COPY mdle_cj.sh /usr/local/bin/mdle_cj.sh
