@@ -1,48 +1,5 @@
 #!/bin/sh
 set -e
 
-if ! mkdir -v /moodle/app 2>/dev/null; then
-
-  echo "Already initialized"
-  
-else
-
-  echo "Installing." | tee /moodle/app/index.html
-  
-  mkdir /moodle/data 
-  chmod +w /moodle/app /moodle/data
-    
-  ( cd /moodle/app
-    echo "Module id moodle-${MOODLE_TEMPLATE_ID}.tar.gz"
-    curl -s lib.moodle-sys:8080/moodle_data/moodle-${MOODLE_TEMPLATE_ID}.tar.gz --output /moodle/moodle-${MOODLE_TEMPLATE_ID}.tar.gz
-    tar -xzf /moodle/moodle-${MOODLE_TEMPLATE_ID}.tar.gz
-  )
-  
-  echo "Initializing..." | tee /moodle/app/index.html
-    
-  php /moodle/app/admin/cli/install.php \
-         --agree-license \
-         --non-interactive \
-         --lang=sl \
-         --dbtype=${MOODLE_DATABASE_TYPE} \
-         --dbhost=${MOODLE_DATABASE_HOST} \
-         --dbport=${MOODLE_DATABASE_PORT_NUMBER}\
-         --dbuser=${MOODLE_DATABASE_USER}\
-         --dbname=${MOODLE_DATABASE_NAME}\
-         --dbpass=${MOODLE_DATABASE_PASSWORD}\
-         --adminuser=${MOODLE_USERNAME} \
-         --adminpass=${MOODLE_PASSWORD} \
-         --adminemail=${MOODLE_EMAIL} \
-         --wwwroot=http://${MOODLE_HOST}/ \
-         --fullname="${MOODLE_FULL_NAME}" \
-         --shortname="${MOODLE_SHORT_NAME}" \
-         --dataroot=/moodle/data \
-  | tee /moodle/app/install.html
-
-  chmod +r /moodle/app/config.php
-  rm /moodle/app/index.html /moodle/app/install.html
-
-fi
-
 php-fpm &
 exec httpd -DFOREGROUND "$@"
