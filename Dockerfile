@@ -1,6 +1,6 @@
 FROM ubi9
 
-RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils && \
+RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils glibc-all-langpacks graphviz && \
     dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf -y install http://rpms.remirepo.net/enterprise/remi-release-9.rpm -y && \
     dnf -y module enable php:remi-8.2 && \
@@ -25,7 +25,7 @@ RUN chmod +x /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/loca
 
 USER 1001
 
-VOLUME [ "/moodle"]
+VOLUME [ "/moodle","/var/local/cache"]
 
 EXPOSE 8080
 
