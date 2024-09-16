@@ -1,0 +1,340 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: moodle
+  annotations:
+    description: "Moodle"
+parameters:
+  - description: URL domain
+    name: HOST
+    required: true
+  - description: Template ID
+    name: TEMPLATE_ID
+    required: true
+  - description: Full name
+    name: FULL_NAME 
+    required: true
+  - description: Short name
+    name: SHORT_NAME 
+    required: true
+  - description: Container version
+    name: TAG 
+    required: true
+    value: latest
+labels:
+  app: mdleapp
+  mdle/id: ${SHORT_NAME}
+  mdle: ''
+objects:
+  - apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: mdl-${SHORT_NAME}
+  - apiVersion: v1
+    kind: Secret
+    type: kubernetes.io/basic-auth
+    metadata:
+      name: mdledb-admin
+      namespace: mdl-${SHORT_NAME}
+    stringData:
+      password: 1pass
+      pgpass: mdledb-cluster-rw:5432:*:postgres:1pass
+      username: postgres
+  - apiVersion: v1
+    kind: Secret
+    type: kubernetes.io/basic-auth
+    metadata:
+      name: mdledb-app
+      namespace: mdl-${SHORT_NAME}
+    stringData:
+      username: mdleuser
+      password: mdlepwdtst150
+  - apiVersion: postgresql.k8s.enterprisedb.io/v1
+    kind: Cluster
+    metadata:
+      name: mdledb-cluster
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      instances: 3
+      superuserSecret:
+        name: mdledb-admin
+      imageName: quay.io/enterprisedb/postgresql:16
+      bootstrap:
+        initdb:
+          database: mdledb
+          owner: mdleuser
+          encoding: 'UTF8'
+          secret:
+            name: mdledb-app
+      storage:
+        storageClass: ocs-storagecluster-ceph-rbd
+        size: 2Gi   
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      labels:
+        app: mdleapp
+      name: mdleapp-config
+      namespace: mdl-${SHORT_NAME}
+    data:
+      MOODLE_HOST: ${HOST}
+      MOODLE_TEMPLATE_ID: ${TEMPLATE_ID}
+      MOODLE_FULL_NAME: ${FULL_NAME}
+      MOODLE_SHORT_NAME: ${SHORT_NAME}
+      MOODLE_USERNAME: admin
+      MOODLE_PASSWORD: redhat
+      MOODLE_EMAIL: admin@moodle.local
+      MOODLE_DATABASE_TYPE: pgsql
+      MOODLE_DATABASE_HOST: mdledb-cluster-rw
+      MOODLE_DATABASE_PORT_NUMBER: "5432"
+      MOODLE_DATABASE_NAME: mdledb
+      MOODLE_DATABASE_USER: mdleuser
+      MOODLE_DATABASE_PASSWORD: mdlepwdtst150 
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      labels:
+        app: mdleapp
+      name: mdleapp
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      lookupPolicy:
+        local: true
+      tags:
+      - annotations:
+          openshift.io/imported-from: quay.io/alojzcerne/moodle:${TAG}
+        from:
+          kind: DockerImage
+          name: quay.io/alojzcerne/moodle:${TAG}
+        importPolicy:
+          importMode: Legacy
+        name: ${TAG}
+        referencePolicy:
+          type: Source
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: mdlestorage
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: 2G
+      storageClassName: ocs-storagecluster-cephfs
+      volumeMode: Filesystem
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      labels:
+        app: mdleapp
+      namespace: mdl-${SHORT_NAME}
+      name: mdleinit
+    spec:
+      ttlSecondsAfterFinished: 300
+      template:
+        metadata:
+          labels:
+            app: mdleapp
+            mdle/id: ${SHORT_NAME}
+            mdle: ''
+          name: mdleinit
+        spec:
+          containers:
+            - name: mdleinit
+              envFrom:
+                - configMapRef:             
+                    name: mdleapp-config
+              image: mdleapp:${TAG}
+              command:
+                - /bin/bash
+                - /usr/local/bin/mdle_init.sh
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 150Mi
+              volumeMounts:
+                - mountPath: /moodle
+                  name: mdlestorage
+          volumes:
+            - name: mdlestorage
+              persistentVolumeClaim:
+                claimName: mdlestorage   
+          restartPolicy: Never
+          
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"mdleapp:${TAG}\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"mdleapp\\\")].image\"}]"
+        abc: mdl-${TAG}
+      labels:
+        app: mdleapp
+      name: mdleapp
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          deployment: mdleapp
+      template:
+        metadata:
+          labels:
+            mdle: ''
+            app: mdleapp
+            mdle/id: ${SHORT_NAME}
+            deployment: mdleapp
+        spec:
+          containers:
+          - envFrom:
+              - configMapRef:
+                  name: mdleapp-config
+            image: ' '
+            name: mdleapp
+            resources:
+              requests:
+                cpu: 100m
+                memory: 150Mi
+            ports:
+            - containerPort: 8080
+              protocol: TCP
+            volumeMounts:
+            - mountPath: /moodle
+              name: mdlestorage
+          volumes:
+          - name: mdlestorage
+            persistentVolumeClaim:
+              claimName: mdlestorage   
+  - apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      labels:
+        app: mdleapp
+      name: mdleapp
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          deployment: mdleapp
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: mdleapp
+      name: mdleapp
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      ports:
+      - name: 8080-tcp
+        port: 8080
+        protocol: TCP
+        targetPort: 8080
+      selector:
+        deployment: mdleapp
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      labels:
+        app: mdleapp
+      name: mdleapp
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      host: ${HOST}
+      port:
+        targetPort: 8080-tcp
+      to:
+        kind: Service
+        name: mdleapp
+      tls:
+        termination: edge
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-deny-by-default
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      podSelector: {}
+      ingress: []
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-allow-from-openshift-ingress
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              policy-group.network.openshift.io/ingress: ""
+      podSelector: {}
+      policyTypes:
+      - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-allow-from-openshift-monitoring
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      podSelector: {}
+      policyTypes:
+      - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-allow-same-namespace
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      podSelector:
+      ingress:
+      - from:
+        - podSelector: {}
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: default-allow-from-kube-apiserver-operator
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      ingress:
+      - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-kube-apiserver-operator
+          podSelector:
+            matchLabels:
+              app: kube-apiserver-operator
+      policyTypes:
+      - Ingress
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-edb-operator
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      podSelector:
+        matchLabels:
+          postgresql: mdledb-cluster
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: openshift-operators
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: cloud-native-postgresql # Matches the Operator pod
+          ports:
+            - port: 8000
+            - port: 5432
+  
+    
