@@ -25,12 +25,10 @@ kind: Deployment
 metadata:
   labels:
     app: lib
-    app.kubernetes.io/component: lib
-    app.kubernetes.io/instance: lib
   name: lib
   namespace: moodle-sys
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       deployment: lib
@@ -64,8 +62,6 @@ kind: Service
 metadata:
   labels:
     app: lib
-    app.kubernetes.io/component: lib
-    app.kubernetes.io/instance: lib
   name: lib
   namespace: moodle-sys
 spec:
@@ -81,3 +77,159 @@ spec:
   selector:
     deployment: lib
 ---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clamav
+  namespace: moodle-sys
+spec:
+  serviceName: clamav
+  replicas: 3
+  selector:
+    matchLabels:
+      app: clamav
+  template:
+    metadata:
+      labels:
+        app: clamav
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: clamav
+          image: quay.io/alojzcerne/clamav:last
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3310
+              name: clamav
+          volumeMounts:
+            - name: virusdb
+              mountPath: /var/lib/clamav
+          resources:
+            requests:
+              cpu: 500m
+              memory: 3Gi
+          readinessProbe:
+            tcpSocket:
+              port: 3310
+            failureThreshold: 24
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+          livenessProbe:
+            tcpSocket:
+              port: 3310
+            initialDelaySeconds: 300
+  volumeClaimTemplates:
+    - metadata:
+        name: virusdb
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: ocs-storagecluster-ceph-rbd
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: clamav
+  name: clamav
+  namespace: moodle-sys
+spec:
+  ports:
+  - name: 3310-tcp
+    port: 3310
+    protocol: TCP
+    targetPort: 3310
+  selector:
+    app: clamav
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-by-default
+  namespace: moodle-sys
+spec:
+  podSelector: {}
+  ingress: []
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-from-openshift-ingress
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          policy-group.network.openshift.io/ingress: ""
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-from-openshift-monitoring
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          network.openshift.io/policy-group: monitoring
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-same-namespace
+  namespace: moodle-sys
+spec:
+  podSelector:
+  ingress:
+  - from:
+    - podSelector: {}
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-from-kube-apiserver-operator
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-kube-apiserver-operator
+      podSelector:
+        matchLabels:
+          app: kube-apiserver-operator
+  policyTypes:
+  - Ingress
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-allow-from-mdle
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          mdle: ''
+      podSelector:
+        matchLabels:
+          app: mdleapp
+    ports:
+      - port: 8080
+      - port: 3310
+
+
+
