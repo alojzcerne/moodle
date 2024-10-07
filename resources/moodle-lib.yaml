@@ -20,9 +20,33 @@ spec:
   storageClassName: ocs-storagecluster-cephfs
   volumeMode: Filesystem
 ---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  labels:
+    app: lib
+  name: lib
+  namespace: moodle-sys
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - annotations:
+      openshift.io/imported-from: registry.access.redhat.com/ubi9/httpd-24:latest
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi9/httpd-24:latest
+    importPolicy:
+      importMode: Legacy
+    name: latest
+    referencePolicy:
+      type: Source
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"lib:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"lib\\\")].image\"}]"
   labels:
     app: lib
   name: lib
@@ -35,14 +59,12 @@ spec:
   strategy: {}
   template:
     metadata:
-      annotations:
-        openshift.io/generated-by: OpenShiftNewApp
-      creationTimestamp: null
       labels:
         deployment: lib
     spec:
       containers:
-      - image: registry.access.redhat.com/ubi9/httpd-24:latest
+      - image: ' '
+        imagePullPolicy: IfNotPresent
         name: lib
         ports:
         - containerPort: 8080
@@ -52,10 +74,26 @@ spec:
         volumeMounts:
         - mountPath: /var/www/html
           name: libstorage
+        env:
+        - name: TZ
+          value: Europe/Ljubljana
       volumes:
       - name: libstorage
         persistentVolumeClaim:
           claimName: libstorage   
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: lib
+  name: lib
+  namespace: moodle-sys
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      deployment: lib
 ---
 apiVersion: v1
 kind: Service
@@ -80,6 +118,8 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
+  labels:
+    app: clamav
   name: clamav
   namespace: moodle-sys
 spec:
@@ -96,8 +136,9 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: clamav
-          image: quay.io/alojzcerne/clamav:last
-          imagePullPolicy: IfNotPresent
+#         image: quay.io/alojzcerne/clamav:latest
+          image: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/clamav:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 3310
               name: clamav
@@ -119,6 +160,9 @@ spec:
             tcpSocket:
               port: 3310
             initialDelaySeconds: 300
+          env:
+          - name: TZ
+            value: Europe/Ljubljana
   volumeClaimTemplates:
     - metadata:
         name: virusdb
@@ -129,6 +173,19 @@ spec:
         resources:
           requests:
             storage: 1Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: clamav
+  name: clamav
+  namespace: moodle-sys
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: clamav
 ---
 apiVersion: v1
 kind: Service
@@ -145,11 +202,102 @@ spec:
     targetPort: 3310
   selector:
     app: clamav
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  labels:
+    app: maxima
+  name: maxima
+  namespace: moodle-sys
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - from:
+      kind: DockerImage
+      name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/goemaxima:2024072400-latest
+    importPolicy:
+      importMode: Legacy
+    name: latest
+    referencePolicy:
+      type: Source
+---
+apiVersion: v1
+# oc adm policy add-scc-to-user anyuid system:serviceaccount:moodle-sys:maxima
+kind: ServiceAccount
+metadata:
+  name: maxima
+  namespace: moodle-sys
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"maxima:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"maxima\\\")].image\"}]"
+  labels:
+    app: maxima
+  name: maxima
+  namespace: moodle-sys
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      deployment: maxima
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        deployment: maxima
+    spec:
+      serviceAccountName: maxima
+      containers:
+      - image: ' '
+        name: maxima
+        resources:
+          requests:
+            cpu: 250m
+            memory: 250Mi
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        env:
+        - name: TZ
+          value: Europe/Ljubljana
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: maxima
+  name: maxima
+  namespace: moodle-sys
+spec:
+  ports:
+  - name: 8080-tcp
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    deployment: maxima
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: maxima
+  name: maxima
+  namespace: moodle-sys
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      deployment: maxima
 ---  
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny-by-default
+  name: deny-by-default
   namespace: moodle-sys
 spec:
   podSelector: {}
@@ -158,7 +306,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-allow-from-openshift-ingress
+  name: allow-from-openshift-ingress
   namespace: moodle-sys
 spec:
   ingress:
@@ -173,7 +321,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-allow-from-openshift-monitoring
+  name: allow-from-openshift-monitoring
   namespace: moodle-sys
 spec:
   ingress:
@@ -188,7 +336,22 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-allow-same-namespace
+  name: allow-from-openshift-logging
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-logging
+  podSelector: {}
+  policyTypes:
+  - Ingress
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
   namespace: moodle-sys
 spec:
   podSelector:
@@ -199,7 +362,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-allow-from-kube-apiserver-operator
+  name: allow-from-kube-apiserver-operator
   namespace: moodle-sys
 spec:
   ingress:
@@ -216,7 +379,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-allow-from-mdle
+  name: allow-from-mdle
   namespace: moodle-sys
 spec:
   ingress:
@@ -230,6 +393,4 @@ spec:
     ports:
       - port: 8080
       - port: 3310
-
-
 

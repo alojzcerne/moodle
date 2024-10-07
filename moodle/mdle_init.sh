@@ -52,7 +52,7 @@ else
   mkdir /moodle/temp /moodle/cache
   sed -i '/wwwroot/a $CFG->tempdir = "/moodle/temp";'                            /moodle/app/config.php
   sed -i '/wwwroot/a $CFG->cachedir = "/moodle/cache";'                          /moodle/app/config.php
-  sed -i '/wwwroot/a $CFG->localcachedir = "/var/local/cache";'              /moodle/app/config.php
+  sed -i '/wwwroot/a $CFG->localcachedir = "/var/local/cache";'                  /moodle/app/config.php
 
   if [[ "xxx$MOODLE_TEMPLATE_ID" =~ "xxx01" ]]; then
     sed -i '/wwwroot/a $CFG->theme = "mtul";' /moodle/app/config.php

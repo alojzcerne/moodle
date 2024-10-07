@@ -3,6 +3,7 @@ apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
   name: moodle
+  namespace: moodle-sys
   annotations:
     description: "Moodle"
 parameters:
@@ -49,7 +50,17 @@ objects:
       namespace: mdl-${SHORT_NAME}
     stringData:
       username: mdleuser
-      password: mdlepwdtst150
+      password: mdlepwdtst150  
+  - apiVersion: objectbucket.io/v1alpha1
+    kind: ObjectBucketClaim
+    metadata:
+      name: mdledb-cluster-backup
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      additionalConfig:
+        bucketclass: noobaa-default-bucket-class
+      bucketName: mdledb-cluster-backup-${SHORT_NAME}
+      storageClassName: openshift-storage.noobaa.io
   - apiVersion: postgresql.k8s.enterprisedb.io/v1
     kind: Cluster
     metadata:
@@ -68,12 +79,41 @@ objects:
           secret:
             name: mdledb-app
       storage:
+        resizeInUseVolumes: true
         storageClass: ocs-storagecluster-ceph-rbd
-        size: 2Gi   
+        size: 1Gi   
+      walStorage:
+        resizeInUseVolumes: true
+        size: 1Gi
+        storageClass: ocs-storagecluster-ceph-rbd
+      backup:
+        retentionPolicy: 5d
+        barmanObjectStore:
+          destinationPath: s3://mdledb-cluster-backup-${SHORT_NAME}/prod
+          endpointURL: http://s3.openshift-storage
+          s3Credentials:
+            accessKeyId:
+              name: mdledb-cluster-backup
+              key: AWS_ACCESS_KEY_ID
+            secretAccessKey:
+              name: mdledb-cluster-backup
+              key: AWS_SECRET_ACCESS_KEY
+          wal:
+            compression: gzip
       resources:
         requests:
           cpu: 100m
           memory: 300Mi
+  - apiVersion: postgresql.k8s.enterprisedb.io/v1
+    kind: ScheduledBackup
+    metadata:
+      name: mdledb-cluster-backup-schedule
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      schedule: "0 0 0 * * *"
+      immediate: true
+      cluster:
+        name: mdledb-cluster
   - apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -87,8 +127,8 @@ objects:
       MOODLE_FULL_NAME: ${FULL_NAME}
       MOODLE_SHORT_NAME: ${SHORT_NAME}
       MOODLE_USERNAME: admin
-      MOODLE_PASSWORD: redhat
-      MOODLE_EMAIL: admin@moodle.local
+      MOODLE_PASSWORD: ;5jy$.*[+_C@whb%P@
+      MOODLE_EMAIL: cdiul-sys@uni-lj.si
       MOODLE_DATABASE_TYPE: pgsql
       MOODLE_DATABASE_HOST: mdledb-cluster-rw
       MOODLE_DATABASE_PORT_NUMBER: "5432"
@@ -107,10 +147,10 @@ objects:
         local: true
       tags:
       - annotations:
-          openshift.io/imported-from: quay.io/alojzcerne/moodle:${TAG}
+          openshift.io/imported-from: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/moodle:${TAG}
         from:
           kind: DockerImage
-          name: quay.io/alojzcerne/moodle:${TAG}
+          name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/moodle:${TAG}
         importPolicy:
           importMode: Legacy
         name: ${TAG}
@@ -162,6 +202,9 @@ objects:
               volumeMounts:
                 - mountPath: /moodle
                   name: mdlestorage
+              env:
+              - name: TZ
+                value: Europe/Ljubljana
           volumes:
             - name: mdlestorage
               persistentVolumeClaim:
@@ -173,7 +216,6 @@ objects:
     metadata:
       annotations:
         image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"mdleapp:${TAG}\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"mdleapp\\\")].image\"}]"
-        abc: mdl-${TAG}
       labels:
         app: mdleapp
       name: mdleapp
@@ -207,6 +249,9 @@ objects:
             volumeMounts:
             - mountPath: /moodle
               name: mdlestorage
+            env:
+            - name: TZ
+              value: Europe/Ljubljana
           volumes:
           - name: mdlestorage
             persistentVolumeClaim:
@@ -241,6 +286,8 @@ objects:
   - apiVersion: route.openshift.io/v1
     kind: Route
     metadata:
+      annotations:
+        haproxy.router.openshift.io/timeout: 10m
       labels:
         app: mdleapp
       name: mdleapp
@@ -257,7 +304,7 @@ objects:
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: default-deny-by-default
+      name: deny-by-default
       namespace: mdl-${SHORT_NAME}
     spec:
       podSelector: {}
@@ -265,7 +312,7 @@ objects:
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: default-allow-from-openshift-ingress
+      name: allow-from-openshift-ingress
       namespace: mdl-${SHORT_NAME}
     spec:
       ingress:
@@ -279,7 +326,7 @@ objects:
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: default-allow-from-openshift-monitoring
+      name: allow-from-openshift-monitoring
       namespace: mdl-${SHORT_NAME}
     spec:
       ingress:
@@ -293,7 +340,7 @@ objects:
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: default-allow-same-namespace
+      name: allow-same-namespace
       namespace: mdl-${SHORT_NAME}
     spec:
       podSelector:
@@ -303,7 +350,7 @@ objects:
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: default-allow-from-kube-apiserver-operator
+      name: allow-from-kube-apiserver-operator
       namespace: mdl-${SHORT_NAME}
     spec:
       ingress:
