@@ -6,11 +6,9 @@ RUN dnf config-manager --set-enabled codeready-builder-for-rhel-9-x86_64-rpms &&
 
 COPY httpd-foreground /usr/local/bin/httpd-foreground
 COPY container.conf /etc/httpd/conf.d/home.conf
-COPY config_local.py /usr/pgadmin4/web/config_local.py
 
-
-RUN chmod +rx  /usr/local/bin/httpd-foreground /etc/httpd/conf.d/home.conf /usr/pgadmin4/web/config_local.py && \
-    chgrp -R 0 /usr/local/bin/httpd-foreground /etc/httpd/conf.d/home.conf /usr/pgadmin4/web/config_local.py && \
+RUN chmod +rx  /usr/local/bin/httpd-foreground /etc/httpd/conf.d/home.conf && \
+    chgrp -R 0 /usr/local/bin/httpd-foreground /etc/httpd/conf.d/home.conf && \
     sed -i "s/Listen 80/Listen 8080/" /etc/httpd/conf/httpd.conf  && \
     httpd -v && \
     mkdir -m 777 -p /run/php-fpm && \
@@ -18,7 +16,6 @@ RUN chmod +rx  /usr/local/bin/httpd-foreground /etc/httpd/conf.d/home.conf /usr/
     
 ENV PGADMIN_SETUP_EMAIL     pgadmin@uni-lj.si
 ENV PGADMIN_SETUP_PASSWORD  ;5jy$.*[+_C@whb%P@
-
 
 USER 1001
 

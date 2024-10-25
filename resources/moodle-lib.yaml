@@ -394,3 +394,21 @@ spec:
       - port: 8080
       - port: 3310
 
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-medit
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          mdle: ''
+      podSelector:
+        matchLabels:
+          app: medit
+    ports:
+      - port: 3310
+
