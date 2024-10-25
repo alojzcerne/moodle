@@ -1,0 +1,126 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 50G
+  storageClassName: ocs-storagecluster-cephfs
+  volumeMode: Filesystem
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  labels:
+    app: pgadmin
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - annotations:
+      openshift.io/imported-from: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/pgadmin:latest
+    from:
+      kind: DockerImage
+      name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/pgadmin:latest
+    importPolicy:
+      importMode: Legacy
+    name: latest
+    referencePolicy:
+      type: Source
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pgadmin
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  ports:
+  - name: 8080-tcp
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  sessionAffinity: ClientIP
+  selector:
+    deployment: pgadmin
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 10m
+  labels:
+    app: pgadmin
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  port:
+    targetPort: 8080-tcp
+  to:
+    kind: Service
+    name: pgadmin
+  tls:
+    termination: edge
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"pgadmin:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"pgadmin\\\")].image\"}]"
+    app: pgadmin
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      deployment: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+        deployment: pgadmin
+    spec:
+      containers:
+      - image: ' '
+        imagePullPolicy: IfNotPresent
+        name: pgadmin
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - mountPath: /pgadmin
+          name: pgadmin
+        env:
+        - name: TZ
+          value: Europe/Ljubljana
+      volumes:
+      - name: pgadmin
+        persistentVolumeClaim:
+          claimName: pgadmin   
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: pgadmin
+  name: pgadmin
+  namespace: moodle-sys
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+---

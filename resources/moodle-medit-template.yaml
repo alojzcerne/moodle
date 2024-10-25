@@ -1,0 +1,175 @@
+---
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: medit
+  namespace: moodle-sys
+  annotations:
+    description: "Moodle development addon"
+parameters:
+  - description: Short name
+    name: SHORT_NAME 
+    required: true
+labels:
+  app: mdledit
+  mdle/id: ${SHORT_NAME}
+  mdle: ''
+objects:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+      storageClassName: ocs-storagecluster-ceph-rbd
+      volumeMode: Filesystem
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      labels:
+        app: medit
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      lookupPolicy:
+        local: true
+      tags:
+      - annotations:
+          openshift.io/imported-from: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/medit:latest
+        from:
+          kind: DockerImage
+          name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/medit:latest
+        importPolicy:
+          importMode: Legacy
+        name: latest
+        referencePolicy:
+          type: Source
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      labels:
+        app: medit
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      type: LoadBalancer
+      ports:
+      - name: ssh
+        port: 22
+        protocol: TCP
+        targetPort: 2022
+      selector:
+        deployment: medit
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: moodle-medit-anyuid-mdl-${SHORT_NAME}
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: system:openshift:scc:anyuid
+    subjects:
+    - kind: ServiceAccount
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: moodle-medit-privileged-mdl-${SHORT_NAME}
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: system:openshift:scc:privileged
+    subjects:
+    - kind: ServiceAccount
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: medit-credentials
+      namespace: mdl-${SHORT_NAME}
+    stringData:
+      devel_pass: ;5jy$.*[+_C@whb%P@
+      authorized_keys: |
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH0J/cyan3OvyieoYlDVXh7P3CidgolimPtL9kt2hxcV
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      annotations:
+        image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"medit:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"medit\\\")].image\"}]"
+        app: medit
+      name: medit
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          deployment: medit
+      template:
+        metadata:
+          labels:
+            medit: ''
+            app: medit
+            mdle/id: ${SHORT_NAME}
+            deployment: medit
+        spec:
+          serviceAccountName: medit
+          hostname: medit-${SHORT_NAME}
+          containers:
+          - image: ' '
+            imagePullPolicy: IfNotPresent
+            name: medit
+            envFrom:
+              - configMapRef:
+                  name: mdleapp-config
+            ports:
+            - containerPort: 2022
+              protocol: TCP
+            securityContext:
+              capabilities:
+                add:
+                  - SYS_CHROOT
+                  - AUDIT_WRITE
+            resources:
+              requests:
+                cpu: 10m
+                memory: 100Mi
+            volumeMounts:
+            - mountPath: /medit
+              name: medit
+            - mountPath: /moodle
+              name: mdlestorage
+            - mountPath: /var/log
+              name: logs
+            - mountPath: /etc/ssh/authorized_keys
+              name: credentials
+              subPath: authorized_keys
+            - mountPath: /etc/devel_pass
+              name: credentials
+              subPath: devel_pass
+            env:
+            - name: TZ
+              value: Europe/Ljubljana
+          volumes:
+            - name: mdlestorage
+              persistentVolumeClaim:
+                claimName: mdlestorage   
+            - name: medit
+              persistentVolumeClaim:
+                claimName: medit
+            - name: logs
+              emptyDir:
+            - name: credentials
+              secret:
+                secretName: medit-credentials

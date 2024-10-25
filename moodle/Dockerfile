@@ -25,7 +25,7 @@ RUN chmod +x /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/loca
 
 USER 1001
 
-VOLUME [ "/moodle","/var/local/cache"]
+VOLUME ["/moodle","/var/local/cache"]
 
 EXPOSE 8080
 

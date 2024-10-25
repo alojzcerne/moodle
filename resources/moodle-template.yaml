@@ -103,7 +103,7 @@ objects:
       resources:
         requests:
           cpu: 100m
-          memory: 300Mi
+          memory: 1Gi
   - apiVersion: postgresql.k8s.enterprisedb.io/v1
     kind: ScheduledBackup
     metadata:
@@ -242,7 +242,7 @@ objects:
             resources:
               requests:
                 cpu: 100m
-                memory: 150Mi
+                memory: 512Mi
             ports:
             - containerPort: 8080
               protocol: TCP
@@ -383,5 +383,22 @@ objects:
           ports:
             - port: 8000
             - port: 5432
-  
-    
+  - apiVersion: networking.k8s.io/v1
+    kind: NetworkPolicy
+    metadata:
+      name: allow-pgadmin
+      namespace: mdl-${SHORT_NAME}
+    spec:
+      podSelector:
+        matchLabels:
+          k8s.enterprisedb.io/cluster: mdledb-cluster
+      ingress:
+        - from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: moodle-sys
+              podSelector:
+                matchLabels:
+                  deployment: pgadmin
+          ports:
+            - port: 5432
