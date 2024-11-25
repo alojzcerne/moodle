@@ -1,3 +1,0 @@
-DATA_DIR = '/pgadmin'
- 
-MASTER_PASSWORD_REQUIRED = True
