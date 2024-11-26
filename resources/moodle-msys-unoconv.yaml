@@ -1,0 +1,99 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  labels:
+    app: unoconv
+  name: unoconv
+  namespace: moodle-sys
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - annotations:
+      openshift.io/imported-from: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/unoconv:latest
+    from:
+      kind: DockerImage
+      name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/unoconv:latest
+    importPolicy:
+      importMode: Legacy
+    name: latest
+    referencePolicy:
+      type: Source
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"unoconv:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"unoconv\\\")].image\"}]"
+  labels:
+    app: unoconv
+  name: unoconv
+  namespace: moodle-sys
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      deployment: unoconv
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        deployment: unoconv
+    spec:
+      containers:
+      - image: ' '
+        imagePullPolicy: IfNotPresent
+        name: unoconv
+        ports:
+        - containerPort: 2002
+          protocol: TCP
+        env:
+        - name: TZ
+          value: Europe/Ljubljana
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: unoconv
+  name: unoconv
+  namespace: moodle-sys
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      deployment: unoconv
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: unoconv
+  name: unoconv
+  namespace: moodle-sys
+spec:
+  ports:
+  - name: 2002-tcp
+    port: 2002
+    protocol: TCP
+    targetPort: 2002
+  selector:
+    deployment: unoconv
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-mdle-unoconv
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          mdle: ''
+      podSelector:
+        matchLabels:
+          app: mdleapp
+    ports:
+      - port: 2002
