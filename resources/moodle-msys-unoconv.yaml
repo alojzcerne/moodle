@@ -73,14 +73,15 @@ metadata:
   name: unoconv
   namespace: moodle-sys
 spec:
+  type: LoadBalancer
   ports:
-  - name: 2002-tcp
-    port: 2002
+  - name: 80-tcp
+    port: 80
     protocol: TCP
     targetPort: 2002
   selector:
     deployment: unoconv
----  
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

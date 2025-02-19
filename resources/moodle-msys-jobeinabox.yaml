@@ -1,0 +1,123 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  labels:
+    app: jobeinabox
+  name: jobeinabox
+  namespace: moodle-sys
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - from:
+      kind: DockerImage
+      name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/jobeinabox:latest
+    importPolicy:
+      importMode: Legacy
+    name: latest
+    referencePolicy:
+      type: Source
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jobeinabox
+  namespace: moodle-sys
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: moodle-sys-jobeinabox-scc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:anyuid
+subjects:
+- kind: ServiceAccount
+  name: jobeinabox
+  namespace: moodle-sys
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"jobeinabox:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"jobeinabox\\\")].image\"}]"
+  labels:
+    app: jobeinabox
+  name: jobeinabox
+  namespace: moodle-sys
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      deployment: jobeinabox
+  template:
+    metadata:
+      labels:
+        deployment: jobeinabox
+    spec:
+      serviceAccountName: jobeinabox
+      containers:
+      - image: ' '
+        name: jobeinabox
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          capabilities:
+            add:
+              - AUDIT_WRITE
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        env:
+        - name: TZ
+          value: Europe/Ljubljana
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jobeinabox
+  name: jobeinabox
+  namespace: moodle-sys
+spec:
+  ports:
+  - name: 80-tcp
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    deployment: jobeinabox
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  labels:
+    app: jobeinabox
+  name: jobeinabox
+  namespace: moodle-sys
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      deployment: jobeinabox
+---  
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-mdle-jobeinabox
+  namespace: moodle-sys
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          mdle: ''
+      podSelector:
+        matchLabels:
+          app: mdleapp
+    ports:
+      - port: 80

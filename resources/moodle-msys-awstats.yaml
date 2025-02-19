@@ -160,31 +160,40 @@ kind: ServiceAccount
 metadata:
   name: mdlecollect
   namespace: openshift-logging
+# https://access.redhat.com/articles/7089860
 ---
-apiVersion: logging.openshift.io/v1
+apiVersion: observability.openshift.io/v1
 kind: ClusterLogForwarder
 metadata:
   name: mdle-awstats
   namespace: openshift-logging
+# annotations:
+#   observability.openshift.io/log-level: debug
 spec:
-  serviceAccountName: mdlecollect
+  serviceAccount: 
+    name: mdlecollect
+  collector:
+    resources:
+      limits:
+        memory: 16Gi
   inputs: 
     - name: apache-logs
+      type: application
       application:
-        selector:
-          matchLabels: 
-            app: mdleapp
+       selector:
+         matchLabels: 
+           app: mdleapp
   pipelines:
-    - inputRefs: 
+    - name: to-awastats-logs
+      inputRefs:
         - apache-logs
-      outputRefs: [ awstats-rsyslog ] 
-  outputs: 
-   - name: awstats-rsyslog
-     type: syslog
-     syslog:
-       addLogSource: true
-       facility: local1
-       rfc: RFC3164
-       payloadKey: message
-       severity: informational
-     url: 'tcp://awstats.moodle-sys:514'
+      outputRefs:
+        - awstats-logs
+  outputs:
+    - name: awstats-logs
+      syslog:
+        appName: moodle
+        facility: local1
+        rfc: RFC5424
+        url: tcp://awstats.moodle-sys:514
+      type: syslog

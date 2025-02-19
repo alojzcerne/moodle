@@ -2,7 +2,7 @@ FROM ubi9
 
 RUN dnf config-manager --set-enabled codeready-builder-for-rhel-9-x86_64-rpms && \
     dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
-    dnf -y update && dnf -y install rsyslog rsyslog-gnutls rsyslog-gssapi rsyslog-mysql rsyslog-pgsql rsyslog-relp procps-ng awstats httpd && \
+    dnf -y update && dnf -y install rsyslog rsyslog-gnutls rsyslog-gssapi rsyslog-mysql rsyslog-pgsql rsyslog-relp jq procps-ng awstats httpd && \
     dnf clean all
 
 COPY rsyslog.sh /usr/local/bin/rsyslog.sh
