@@ -15,12 +15,13 @@ else
     
   if [[ $MOODLE_TEMPLATE_ID =~ 'git:' ]]; then
     TID=$(cut -d':' -f2 <<<$MOODLE_TEMPLATE_ID)
+    TBD=$(cut -d':' -f3 <<<$MOODLE_TEMPLATE_ID)
     mkdir /moodle/new
     cd /moodle/new
     echo "Module id https://gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git"
     ( git clone https://${GIT_CRED_REPO}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git 
       cd app
-      git checkout main
+      git checkout ${TBD:-main}
     ) 
     mv /moodle/app /moodle/app.old
     mkdir /moodle/app

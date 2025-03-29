@@ -139,8 +139,9 @@ objects:
       MOODLE_DATABASE_NAME: mdledb
       MOODLE_DATABASE_USER: mdleuser
       MOODLE_DATABASE_PASSWORD: mdlepwdtst150 
-      GIT_CRED_REPO: moodle:glpat-711AQVF3vzXMtm5wKXz4
-      GIT_CRED_CONF: moodle:glpat-i-pVD1Ycxbewxb_MQzr5
+      GIT_CRED_REPO: moodle:glpat-mwSRsezzyETsqYHs_a4x
+      GIT_CRED_CONF: moodle:glpat-mwSRsezzyETsqYHs_a4x
+      GIT_CRED_UTLS: moodle:glpat--_rVFqMKK7Kn2yNzFzoG
   - apiVersion: image.openshift.io/v1
     kind: ImageStream
     metadata:

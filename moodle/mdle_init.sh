@@ -16,24 +16,20 @@ else
     
   if [[ $MOODLE_TEMPLATE_ID =~ 'git:' ]]; then
     TID=$(cut -d':' -f2 <<<$MOODLE_TEMPLATE_ID)
+    TBD=$(cut -d':' -f3 <<<$MOODLE_TEMPLATE_ID)
     mkdir /moodle/new
     cd /moodle/new
-    echo "Module id https://gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git"
-    ( git clone https://${GIT_CRED_REPO}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git 
-      cd app
-      git checkout main
-    ) 
-    ( git clone https://${GIT_CRED_CONF}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/admin-presets.git
-      cd admin-presets
-      git checkout main
-    ) 
+    echo "Module id https://gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git#${TBD}" | tee /moodle/app/index.html
+    git clone -b ${TBD:-main} --single-branch https://${GIT_CRED_REPO}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git 
+    echo "Module id https://gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/admin-presets.git#${TBD}" | tee /moodle/app/index.html
+    git clone -b ${TBD:-main} --single-branch https://${GIT_CRED_CONF}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/admin-presets.git
     mv /moodle/new/app/* /moodle/app
     mv /moodle/new/admin-presets/moodle-${TID}.xml /moodle/moodle-${TID}.xml
     rm -rf /moodle/new
   else
     TID=${MOODLE_TEMPLATE_ID}
     cd /moodle/app
-    echo "Module id moodle-${TID}.tar.gz"
+    echo "Module id moodle-${TID}.tar.gz" | tee /moodle/app/index.html
     curl -s lib.moodle-sys:8080/moodle_data/moodle-${TID}.tar.gz --output /moodle/moodle-${TID}.tar.gz
     curl -s lib.moodle-sys:8080/moodle_data/moodle-${TID}.xml --output /moodle/moodle-${TID}.xml
     tar -xzf /moodle/moodle-${TID}.tar.gz
