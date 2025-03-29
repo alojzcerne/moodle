@@ -10,10 +10,11 @@ while true; do
     mkdir /awstats/config /awstats/data /awstats/app && exit 0
     mkdir /awstats/log 
     mv $(find /awstats -name awstats.20\* | sort | head -$NFILES) /awstats/input
-    for NS in $(sed 's/\\n//g' /awstats/input/* | sed 's/.* moodle //' | jq -r .kubernetes.namespace_name | sort | uniq); do
-      sed 's/\\n//g' /awstats/input/* | sed 's/.* moodle //' | jq -r '. | select(.kubernetes.namespace_name=="'${NS}'") .message' | sed -E 's/(.*)(, \S*)( -.*)/\1\3/p' > /awstats/log/access_log-${NS}
+    cat /awstats/input/* | sort | sed -En 's/.*moodle.* (\{"@.*\})$/\1/p'  | jq -r '. | select(.kubernetes.namespace_name | startswith("mdl-")) | select(.kubernetes.pod_name | startswith("mdleapp-")) .kubernetes.namespace_name' | sort | uniq > /awstats/input/awstats.ns
+    for NS in $(cat /awstats/input/awstats.ns); do
+      cat /awstats/input/* | sort | sed -En 's/.*moodle.* (\{"@.*\})$/\1/p'  | jq -r '. | select(.kubernetes.namespace_name=="'${NS}'") | select(.kubernetes.pod_name | startswith("mdleapp-")) .message' > /awstats/log/access_log-${NS}
     done
-    sed 's/\\n//g' /awstats/input/* | sed 's/.* moodle //' | jq -r '.message' | sed -E 's/(.*)(, \S*)( -.*)/\1\3/p' > /awstats/log/access_log-all
+    cat /awstats/input/* | sort | sed -En 's/.*moodle.* (\{"@.*\})$/\1/p'  | jq -r '. | select(.kubernetes.namespace_name | startswith("mdl-")) | select(.kubernetes.pod_name | startswith("mdleapp-")) .message' > /awstats/log/access_log-all
     for LF in all $(ls -1 /awstats/log | sed -nE 's/access_log-(.*)/\1/p'); do
       sed "s!/var/log/httpd/access_log!/awstats/log/access_log-${LF}!g" /etc/awstats/awstats.model.conf \
           | sed "s/localhost.localdomain/access_log-${LF}/" \

@@ -1,5 +1,4 @@
-# /bin/bash
-#!/bin/sh
+#!/bin/bash
 set -e
 
 if ! mkdir -v /moodle/app 2>/dev/null; then
@@ -15,20 +14,39 @@ else
   mkdir /moodle/data 
   chmod +w /moodle/app /moodle/data
     
-  ( cd /moodle/app
-    echo "Module id moodle-${MOODLE_TEMPLATE_ID}.tar.gz"
-    curl -s lib.moodle-sys:8080/moodle_data/moodle-${MOODLE_TEMPLATE_ID}.tar.gz --output /moodle/moodle-${MOODLE_TEMPLATE_ID}.tar.gz
-    curl -s lib.moodle-sys:8080/moodle_data/moodle-${MOODLE_TEMPLATE_ID}.xml --output /moodle/moodle-${MOODLE_TEMPLATE_ID}.xml
-    tar -xzf /moodle/moodle-${MOODLE_TEMPLATE_ID}.tar.gz
-  )
-  
+  if [[ $MOODLE_TEMPLATE_ID =~ 'git:' ]]; then
+    TID=$(cut -d':' -f2 <<<$MOODLE_TEMPLATE_ID)
+    mkdir /moodle/new
+    cd /moodle/new
+    echo "Module id https://gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git"
+    ( git clone https://${GIT_CRED_REPO}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/app.git 
+      cd app
+      git checkout main
+    ) 
+    ( git clone https://${GIT_CRED_CONF}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/template-${TID}/admin-presets.git
+      cd admin-presets
+      git checkout main
+    ) 
+    mv /moodle/new/app/* /moodle/app
+    mv /moodle/new/admin-presets/moodle-${TID}.xml /moodle/moodle-${TID}.xml
+    rm -rf /moodle/new
+  else
+    TID=${MOODLE_TEMPLATE_ID}
+    cd /moodle/app
+    echo "Module id moodle-${TID}.tar.gz"
+    curl -s lib.moodle-sys:8080/moodle_data/moodle-${TID}.tar.gz --output /moodle/moodle-${TID}.tar.gz
+    curl -s lib.moodle-sys:8080/moodle_data/moodle-${TID}.xml --output /moodle/moodle-${TID}.xml
+    tar -xzf /moodle/moodle-${TID}.tar.gz
+    rm /moodle/moodle-${TID}.tar.gz
+  fi
+   
   echo "Initializing..." | tee /moodle/app/index.html
     
   php /moodle/app/admin/cli/install.php \
          --agree-license \
          --non-interactive \
          --lang=sl \
-         --sitepreset=/moodle/moodle-${MOODLE_TEMPLATE_ID}.xml \
+         --sitepreset=/moodle/moodle-${TID}.xml \
          --dbtype=${MOODLE_DATABASE_TYPE} \
          --dbhost=${MOODLE_DATABASE_HOST} \
          --dbport=${MOODLE_DATABASE_PORT_NUMBER}\
@@ -54,15 +72,15 @@ else
   sed -i '/wwwroot/a $CFG->cachedir = "/moodle/cache";'                          /moodle/app/config.php
   sed -i '/wwwroot/a $CFG->localcachedir = "/var/local/cache";'                  /moodle/app/config.php
 
-  if [[ "xxx$MOODLE_TEMPLATE_ID" =~ "xxx01" ]]; then
+  if [[ "xxx$TID" =~ "xxx01" ]]; then
     sed -i '/wwwroot/a $CFG->theme = "mtul";' /moodle/app/config.php
   fi
-  if [[ "xxx$MOODLE_TEMPLATE_ID" =~ "xxx02" ]]; then
+  if [[ "xxx$TID" =~ "xxx02" ]]; then
     sed -i '/wwwroot/a $CFG->theme = "mtul_slim";' /moodle/app/config.php
   fi
 
   chmod a=r /moodle/app/config.php
   rm /moodle/app/index.html /moodle/app/install.txt
-  rm /moodle/moodle-${MOODLE_TEMPLATE_ID}.tar.gz /moodle/moodle-${MOODLE_TEMPLATE_ID}.xml
+  rm /moodle/moodle-${TID}.xml
 
 fi

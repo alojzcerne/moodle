@@ -195,5 +195,5 @@ spec:
         appName: moodle
         facility: local1
         rfc: RFC5424
-        url: tcp://awstats.moodle-sys:514
+        url: tcp://awstats.moodle-sys:1514
       type: syslog

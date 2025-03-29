@@ -70,7 +70,11 @@ objects:
       instances: 3
       superuserSecret:
         name: mdledb-admin
-      imageName: quay.io/enterprisedb/postgresql:16
+#     imageName: quay.io/enterprisedb/postgresql:16
+#     imageName: quay.io/enterprisedb/postgresql:17
+      imageName: quay.io/enterprisedb/edb-postgres-advanced:16.8-ubi9
+#     imageName: quay.io/enterprisedb/edb-postgres-advanced:17
+#     imageName: quay.io/enterprisedb/edb-postgres-advanced:17-ubi9
       bootstrap:
         initdb:
           database: mdledb
@@ -135,6 +139,8 @@ objects:
       MOODLE_DATABASE_NAME: mdledb
       MOODLE_DATABASE_USER: mdleuser
       MOODLE_DATABASE_PASSWORD: mdlepwdtst150 
+      GIT_CRED_REPO: moodle:glpat-711AQVF3vzXMtm5wKXz4
+      GIT_CRED_CONF: moodle:glpat-i-pVD1Ycxbewxb_MQzr5
   - apiVersion: image.openshift.io/v1
     kind: ImageStream
     metadata:
@@ -153,7 +159,7 @@ objects:
           name: central-quay-registry.apps.cdiul-iso.uni-lj.si/moodle/moodle:${TAG}
         importPolicy:
           importMode: Legacy
-        name: ${TAG}
+        name: latest
         referencePolicy:
           type: Source
   - apiVersion: v1
@@ -191,7 +197,7 @@ objects:
               envFrom:
                 - configMapRef:             
                     name: mdleapp-config
-              image: mdleapp:${TAG}
+              image: mdleapp
               command:
                 - /bin/bash
                 - /usr/local/bin/mdle_init.sh
@@ -215,7 +221,7 @@ objects:
     kind: Deployment
     metadata:
       annotations:
-        image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"mdleapp:${TAG}\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"mdleapp\\\")].image\"}]"
+        image.openshift.io/triggers: "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"mdleapp:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"mdleapp\\\")].image\"}]"
       labels:
         app: mdleapp
       name: mdleapp

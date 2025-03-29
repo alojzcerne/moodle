@@ -5,9 +5,8 @@ USER root
 EXPOSE 2022
 
 RUN dnf -y update && \
-    dnf -y \
-       install openssh-server passwd nmap-ncat \
-       git nano rsync && \
+    dnf -y module enable postgresql:16  && \
+    dnf -y install openssh-server passwd nmap-ncat nano rsync postgresql && \
     dnf clean all
 COPY files/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key
 COPY files/ssh_host_rsa_key.pub /etc/ssh/ssh_host_rsa_key.pub

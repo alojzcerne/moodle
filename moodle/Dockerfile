@@ -1,6 +1,6 @@
 FROM ubi9
 
-RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils glibc-all-langpacks graphviz && \
+RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils glibc-all-langpacks graphviz git && \
     dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf -y install http://rpms.remirepo.net/enterprise/remi-release-9.rpm -y && \
     dnf -y module enable php:remi-8.2 && \
@@ -11,13 +11,14 @@ RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-
 COPY httpd-foreground /usr/local/bin/httpd-foreground
 COPY mdle_cj.sh /usr/local/bin/mdle_cj.sh
 COPY mdle_init.sh /usr/local/bin/mdle_init.sh
+COPY mdle_upgrade.sh /usr/local/bin/mdle_upgrade.sh
 COPY container.conf /etc/httpd/conf.d/home.conf
 COPY container.ini /etc/php.d/99-home.ini
 COPY 00-mpm.conf /etc/httpd/conf.modules.d/00-mpm.conf
 COPY scan.conf /etc/clamd.d/scan.conf
 
-RUN chmod +x /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/local/bin/mdle_init.sh && \
-    chmod -R g=u /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/local/bin/mdle_init.sh /etc/httpd/conf.d/home.conf /etc/php.d/99-home.ini /etc/httpd/conf.modules.d/00-mpm.conf /etc/clamd.d/scan.conf && \
+RUN chmod +x /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/local/bin/mdle_init.sh /usr/local/bin/mdle_upgrade.sh && \
+    chmod -R g=u /usr/local/bin/httpd-foreground /usr/local/bin/mdle_cj.sh /usr/local/bin/mdle_init.sh /usr/local/bin/mdle_upgrade.sh /etc/httpd/conf.d/home.conf /etc/php.d/99-home.ini /etc/httpd/conf.modules.d/00-mpm.conf /etc/clamd.d/scan.conf && \
     sed -i "s/Listen 80/Listen 8080/" /etc/httpd/conf/httpd.conf && \
     rm -rf /var/lib/clamav/* && \
     dnf clean all && \
