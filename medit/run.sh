@@ -24,11 +24,12 @@ touch /var/log/lastlog
 chgrp utmp /var/log/lastlog
 chmod 664 /var/log/lastlog
 
-rm -rf /usr/local/builder
-git clone https://${GIT_CRED_UTLS}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/builder.git /usr/local/builder
-chmod -v +x /usr/local/builder/scripts/* 
-mv -v /usr/local/builder/scripts/* /usr/local/bin
-rm -rf /usr/local/builder/.git /usr/local/builder/scripts
-
+if [ "${GIT_CRED_UTLS}" != "" ]; then
+  rm -rf /usr/local/builder
+  git clone https://${GIT_CRED_UTLS}@gitlab.utility.cdiul-iso.uni-lj.si/moodle/builder.git /usr/local/builder
+  chmod -v +x /usr/local/builder/scripts/* 
+  mv -v /usr/local/builder/scripts/* /usr/local/bin
+  rm -rf /usr/local/builder/.git /usr/local/builder/scripts
+fi
 exec /usr/sbin/sshd -D -e
 
