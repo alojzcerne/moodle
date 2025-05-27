@@ -1,12 +1,12 @@
 FROM ubi9
 
-RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils glibc-all-langpacks graphviz git && \
+RUN dnf -y update && yum install -y httpd procps-ng postfix ghostscript poppler-utils glibc-all-langpacks graphviz git nmap-ncat && \
     dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf -y install http://rpms.remirepo.net/enterprise/remi-release-9.rpm -y && \
     dnf -y module enable php:remi-8.2 && \
     dnf -y install php php-{fpm,curl,pgsql,xml,ldap,soap,bcmath,bz2,intl,gd,mbstring,zip,mysqlnd,sodium,tidy} php-pecl-yaml && \
     dnf -y install http://rpmfind.net/linux/centos-stream/9-stream/CRB/x86_64/os/Packages/aspell-0.60.8-8.el9.x86_64.rpm aspell-sl && \
-    dnf -y install clamav
+    dnf -y install clamav librdkafka php-pecl-rdkafka
 
 COPY httpd-foreground /usr/local/bin/httpd-foreground
 COPY mdle_cj.sh /usr/local/bin/mdle_cj.sh

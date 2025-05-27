@@ -9,7 +9,7 @@ else
 
   echo "Installing." | tee /moodle/app/index.html
   
-  sleep 20
+  sleep 30; while ! nc -z mdledb-cluster-rw 5432 ; do echo "Waiting for db..."; sleep 15; done
   
   mkdir /moodle/data 
   chmod +w /moodle/app /moodle/data
