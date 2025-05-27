@@ -85,7 +85,7 @@ objects:
       storage:
         resizeInUseVolumes: true
         storageClass: ocs-storagecluster-ceph-rbd
-        size: 1Gi   
+        size: 2Gi   
       walStorage:
         resizeInUseVolumes: true
         size: 1Gi
